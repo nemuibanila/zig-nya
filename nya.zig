@@ -36,9 +36,9 @@ const nya_string = blk: {
 };
 
 const nya_lens = blk: {
-    var lens = [_]usize{0}**nyas.len;
+    var lens = [_]u8{0}**nyas.len;
     for (nyas, 0..) |nya, i| {
-        lens[i] = nya.len + 1;
+        lens[i] = @intCast(nya.len + 1);
     }
     break :blk lens;
 };
@@ -90,7 +90,9 @@ pub fn main() !void {
         var precalc_rng: [64]u8 = undefined;
         // Pcg beats by other RNGs by kilometers
         pcg.fill(std.mem.sliceAsBytes(precalc_rng[0..]));
-        for (0..precalc_rng.len) |i| {precalc_rng[i] = precalc_rng[i] % @as(u8, nyas.len); }
+        for (0..precalc_rng.len) |i| {
+            precalc_rng[i] = precalc_rng[i] % @as(u8, nyas.len); 
+        }
 
         for (0..nya_this_iteration) |i| {
             const choice = precalc_rng[i];
