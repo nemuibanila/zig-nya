@@ -95,7 +95,9 @@ pub fn main() !void {
         for (0..nya_this_iteration) |i| {
             const choice = precalc_rng[i];
             const nyalen = nya_lens[choice];
-            buf_writer.write_fast(nya_string[choice*8..(choice+1)*8], nyalen);
+            var str_choice: [8]u8 = undefined;
+            @memcpy(str_choice[0..], nya_string[choice*8..choice*8 + 8]);
+            buf_writer.write_fast(&str_choice, nyalen);
         }
         
         nya_num -= nya_this_iteration;
