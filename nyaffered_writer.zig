@@ -14,16 +14,20 @@ pub fn NyafferedWriter(comptime buffer_size: usize, comptime WriterType: type) t
     return struct {
         unbuffered_writer: WriterType,
         buf: [buffer_size]u8 = undefined,
-        end: usize = 0,
+        end: []u8 = undefined,
 
         const Error = {};
         pub const Writer = io.Writer(*Self, Error, write);
 
         const Self = @This();
 
+        pub fn init(self: *Self) void {
+            self.end = self.buf[0..];
+        }
+
         pub fn flush(self: *Self) !void {
-            try self.unbuffered_writer.writeAll(self.buf[0..self.end]);
-            self.end = 0;
+            try self.unbuffered_writer.writeAll(self.buf[0..self.buf.len-self.end.len]);
+            self.end = self.buf[0..];
         }
 
         pub fn writer(self: *Self) Writer {
@@ -33,17 +37,29 @@ pub fn NyafferedWriter(comptime buffer_size: usize, comptime WriterType: type) t
         // It is the responsibility of the caller to not violate the length of the buffer
         // Boundschecking in the write function has been omitted for performance reasons.
         // bytes must be padded to 8 bytes.
-        pub inline fn write_fast(self: *Self, bytes: []align(8)const u8) void {
+        pub inline fn write_fast(self: *Self, bytes: []const u8) void {
             @setRuntimeSafety(false);
+            var _bufbuf = self.end;
+            var _bytes = bytes;
             const real_len = bytes.len;
-            var _bytes = bytes.ptr[0..(bytes.len/main.PL)*main.PL + main.PL];
-            @memcpy(self.buf[self.end..self.end+_bytes.len], _bytes);
-            self.end += real_len;
+            
+            //@memcpy(self.buf[self.end..self.end+_bytes.len], _bytes);
+
+            // simple vectorized memcpy with assumptions
+            for (0..(bytes.len/main.PL + 1)) |_| {
+                for(0..main.PL) |i| {
+                    _bufbuf[i] = _bytes[i];
+                }
+                _bufbuf = _bufbuf[main.PL..];
+                _bytes = _bytes[main.PL..];
+            }
+            
+            self.end = self.end[real_len..];
         }
 
         pub fn write(self: *Self, bytes: []const u8) void {
-            @memcpy(self.buf[self.end..self.end+bytes.len], bytes);
-            self.end += bytes.len;
+            @memcpy(self.end[0..bytes.len], bytes);
+            self.end = self.end[bytes.len..];
         }
     };
 }

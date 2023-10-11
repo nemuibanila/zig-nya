@@ -5,6 +5,7 @@ const NyaWrite = @import("nyaffered_writer.zig").NyafferedWriter;
 
 // Eventually make this configurable :3
 const nyas = [_][]const u8{ "nya ", "nyaa~ ", "mwrp ", "mwrwrwp ", "uwu ", ">w< ", "ehehe~ " };
+
 const MaxNya = blk: {
     comptime var maxlen: usize = 0;
     for (nyas) |nya| {
@@ -12,7 +13,7 @@ const MaxNya = blk: {
     }
     break :blk maxlen;
 };
-pub const PL = 16; // padding length
+pub const PL = 8; // padding length
 pub const precomp = 4;
 var prng = std.rand.DefaultPrng.init(0);
 var pcg = std.rand.Pcg.init(0);
@@ -57,9 +58,11 @@ pub fn main() !void {
     // Initialize the special NyafferedWriter, which brings the nyas
     var buf_writer = NyaWrite(chunksize, @TypeOf(std.io.getStdOut().writer()))
     { .unbuffered_writer = std.io.getStdOut().writer() };
+    // Current limitation of zig, cant initialize with pointer value from itself.
+    buf_writer.init();
 
     // The nyalist will store precomputed strings of nyas up to precomp-length.
-    var nyalist = std.ArrayList([]align(8)u8).init(alloc);
+    var nyalist = std.ArrayList([]u8).init(alloc);
     defer {
         for (nyalist.items) |item| {
             const internal_length = (item.len / PL) * PL + PL;
@@ -161,7 +164,7 @@ pub fn main() !void {
         pcg.fill(std.mem.sliceAsBytes(precalc_rng[0..]));
         for (0..precalc_rng.len) |i| {precalc_rng[i] = precalc_rng[i] % @as(u16, nyalist_len); }
 
-        inline for (0..for_chunks) |i| {
+        for (0..for_chunks) |i| {
             var mlem = precalc_rng[i];
             buf_writer.write_fast(nyalist.items[mlem]);
         }
