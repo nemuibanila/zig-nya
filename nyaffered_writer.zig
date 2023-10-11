@@ -4,10 +4,10 @@
 // MIT-License (text at bottom)
 
 const std = @import("std");
+const main = @import("nya.zig");
 
 const io = std.io;
 const mem = std.mem;
-
 
 
 pub fn NyafferedWriter(comptime buffer_size: usize, comptime WriterType: type) type {
@@ -32,21 +32,18 @@ pub fn NyafferedWriter(comptime buffer_size: usize, comptime WriterType: type) t
 
         // It is the responsibility of the caller to not violate the length of the buffer
         // Boundschecking in the write function has been omitted for performance reasons.
-        pub inline fn write(self: *Self, bytes: []const u8) void {
-            var _bytes = bytes;
-            while (_bytes.len >= 8) {
-                @memcpy(self.buf[self.end..self.end+8], _bytes[0..8]);
-                self.end += 8;
-                _bytes = _bytes[8..];
-            } else {
-                switch(_bytes.len) {
-                    inline 0...7 => |i| {
-                        @memcpy(self.buf[self.end..self.end+i], _bytes[0..i]);
-                        self.end += i;
-                    },
-                    else => unreachable,
-                }
-            }
+        // bytes must be padded to 8 bytes.
+        pub inline fn write_fast(self: *Self, bytes: []align(8)const u8) void {
+            @setRuntimeSafety(false);
+            const real_len = bytes.len;
+            var _bytes = bytes.ptr[0..(bytes.len/main.PL)*main.PL + main.PL];
+            @memcpy(self.buf[self.end..self.end+_bytes.len], _bytes);
+            self.end += real_len;
+        }
+
+        pub fn write(self: *Self, bytes: []const u8) void {
+            @memcpy(self.buf[self.end..self.end+bytes.len], bytes);
+            self.end += bytes.len;
         }
     };
 }

@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const NyaWrite = @import("nyaffered_writer.zig").NyafferedWriter;
 
+
 // Eventually make this configurable :3
 const nyas = [_][]const u8{ "nya ", "nyaa~ ", "mwrp ", "mwrwrwp ", "uwu ", ">w< ", "ehehe~ " };
 const MaxNya = blk: {
@@ -11,7 +12,8 @@ const MaxNya = blk: {
     }
     break :blk maxlen;
 };
-
+pub const PL = 16; // padding length
+pub const precomp = 4;
 var prng = std.rand.DefaultPrng.init(0);
 var pcg = std.rand.Pcg.init(0);
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -47,7 +49,6 @@ pub fn main() !void {
     var nya_num = try std.fmt.parseInt(u64, args[1], 10);
 
     // precompute an appropriate buffer size
-    const precomp = 3;
     comptime var nyalist_len: usize = std.math.pow(usize, nyas.len, precomp); 
     const for_chunks = 100;
     @setEvalBranchQuota(for_chunks * 10);
@@ -58,13 +59,18 @@ pub fn main() !void {
     { .unbuffered_writer = std.io.getStdOut().writer() };
 
     // The nyalist will store precomputed strings of nyas up to precomp-length.
-    var nyalist = std.ArrayList([]u8).init(alloc);
+    var nyalist = std.ArrayList([]align(8)u8).init(alloc);
     defer {
         for (nyalist.items) |item| {
-            alloc.free(item);
+            const internal_length = (item.len / PL) * PL + PL;
+            alloc.free(item.ptr[0..internal_length]);
         }
         nyalist.deinit();
     }
+
+    // also we dont need to keep precomp fixed!
+    // we can calculate it based on the amounts of nyas
+    // this increases performance for low amounts of nyas
 
     // this is probably not the best way to precompute the nyas
     // we already know how long the final string is going to be
@@ -76,9 +82,23 @@ pub fn main() !void {
         for (idx) |j| {
             try alist.appendSlice(nyas[j]);
         }        
+
+        // pad the length to a multiple of 8
+        // we know that len > 0
+        const real_length = alist.items.len;
+        try alist.appendNTimes(' ',  (alist.items.len/PL + 1)*PL - alist.items.len);
+
         // the memory allocated by array list is managed by the nyalist now
         var cpy = try alloc.dupe(u8, alist.items);
-        try nyalist.append(cpy);
+
+        // check for alignment
+        if (!std.mem.isAligned(@intFromPtr(cpy.ptr), PL)) {
+            return error.NyaNyotAligned;
+        }
+
+        // now nyalist contains a slice that has padding to the nearest 8-boundary
+        // put the real length back for ease of implementation
+        try nyalist.append(@alignCast(cpy[0..real_length]));
 
         // counts up the indices one at a time
          { comptime var i: usize = 0; 
@@ -141,9 +161,9 @@ pub fn main() !void {
         pcg.fill(std.mem.sliceAsBytes(precalc_rng[0..]));
         for (0..precalc_rng.len) |i| {precalc_rng[i] = precalc_rng[i] % @as(u16, nyalist_len); }
 
-        for (0..for_chunks) |i| {
+        inline for (0..for_chunks) |i| {
             var mlem = precalc_rng[i];
-            buf_writer.write(nyalist.items[mlem]);
+            buf_writer.write_fast(nyalist.items[mlem]);
         }
         nya_num -= precomp * for_chunks;
         try buf_writer.flush();
