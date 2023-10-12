@@ -23,17 +23,25 @@ const NyaTotalPL = blk: {
     break :blk sum;
 };
 
-const nya_string = blk: {
+const nya_buf_cur = blk: {
     var buf = [_]u8{' '}**NyaTotalPL;
+    var cursors = [_]u16{0}**(nyas.len+1);
     var cursor = 0;
-    for (nyas) |nya| {
+    for (nyas, 0..) |nya, i| {
         var steps = (nya.len - 1) / 8 + 1;
         const new_cursor = cursor + steps;
         @memcpy(buf[8*cursor..8*cursor+nya.len], nya);
+        cursors[i] = cursor;
         cursor = new_cursor;
+        if (i == nyas.len - 1) {
+            cursors[i+1] = cursor;
+        }
     }
-    break :blk buf;
+    break :blk .{buf, cursors};
 };
+
+const nya_string = nya_buf_cur[0];
+const nya_cursor = nya_buf_cur[1];
 
 const nya_lens = blk: {
     var lens = [_]u8{0}**nyas.len;
@@ -97,9 +105,9 @@ pub fn main() !void {
         for (0..nya_this_iteration) |i| {
             const choice = precalc_rng[i];
             const nyalen = nya_lens[choice];
-            var str_choice: [8]u8 = undefined;
-            @memcpy(str_choice[0..], nya_string[choice*8..choice*8 + 8]);
-            buf_writer.write_fast(&str_choice, nyalen);
+            const cursor = nya_cursor[choice];
+            const steps = nya_cursor[choice+1] - cursor;
+            buf_writer.write_fast(nya_string[8*cursor..8*cursor+8*steps], nyalen);
         }
         
         nya_num -= nya_this_iteration;
