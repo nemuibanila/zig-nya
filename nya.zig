@@ -4,7 +4,7 @@ const NyaWrite = @import("nyaffered_writer.zig").NyafferedWriter;
 
 
 // Eventually make this configurable :3
-const nyas = [_][]const u8{ "nya", "nyaa~", "mwrp", "mwrwrwp", "uwu", ">w<", "ehehe~" };
+const nyas = [_][]const u8{ "nya", "nyaa~", "mwrp", "mwrwrwp", "uwu", "owo", "OwO", "UwU", "猫", ">w<", "ehehe~" };
 
 const MaxNya = blk: {
     comptime var maxlen: usize = 0;
